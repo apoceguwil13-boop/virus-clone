@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://unpkg.com/@tonconnect/sdk@latest/dist/tonconnect-sdk.min.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+    <div id="health">Здоровье: 100%</div>
+    <button id="tap">Выжить/Заражать</button>
+    <div id="tokens">Токены: 0</div>
+    <button id="roulette">Рулетка</button>
+
+    <script>
+        Telegram.WebApp.ready();
+        Telegram.WebApp.MainButton.setText('Заработать').show().onClick(() => { /* backend API */ });
+
+        let tokens = 0;
+        document.getElementById('tap').onclick = () => {
+            tokens += 1; // Логика вируса/выживания
+            document.getElementById('tokens').textContent = `Токены: ${tokens}`;
+            Telegram.WebApp.HapticFeedback.impactOccurred('light');
+        };
+
+        // TON Connect для вывода
+        const connector = new TON_CONNECT_SDK.TonConnect({ manifestUrl: 'https://your-site/tonconnect-manifest.json' });
+        // ... подключение кошелька, отправка транзакций
+    </script>
+</body>
+</html>
