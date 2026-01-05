@@ -4,85 +4,125 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://unpkg.com/@tonconnect/sdk@latest/dist/tonconnect-sdk.min.js"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Virus Clone</title>
-    <style>body{font-family:Arial;text-align:center;background:#111;color:#0f0;} button{padding:15px;font-size:18px;margin:10px;background:#333;color:#0f0;border:1px solid #0f0;}</style>
+    <title>🦠 Virus Clone</title>
+    <style>
+        body{font-family:Arial,sans-serif;text-align:center;background:linear-gradient(45deg,#111,#220;color:#0f0;padding:20px;}
+        button{padding:15px;font-size:18px;margin:10px;border:2px solid #0f0;background:#222;color:#0f0;border-radius:10px;cursor:pointer;}
+        button:active{background:#0f0;color:#111;}
+        #status{font-size:24px;}
+    </style>
 </head>
 <body>
-    <h1>🦠 Virus Play Clone</h1>
-    <div id="health">Здоровье: 100%</div>
-    <button id="tap">👆 Выжить (+1-10 $VIRUS)</button>
+    <h1>🦠 VIRUS PLAY Clone</h1>
+    <div id="health">Здоровье: 100% 💪</div>
     <div id="tokens">Токены $VIRUS: 0</div>
-    <button id="roulette">🎰 Рулетка (x2 или lose)</button>
-    <button id="withdraw">💰 Вывод TON</button>
+    <div id="status"></div>
+    
+    <button id="tap">👆 Тапай! Выжить (+1-5 $VIRUS)</button>
+    <button id="roulette">🎰 Рулетка (10 $VIRUS → x2 или lose)</button>
+    <button id="tasks">📋 Задания (+50 $VIRUS)</button>
+    <button id="withdraw">💰 Вывод на TON (мин. 100)</button>
 
     <script>
         Telegram.WebApp.ready();
         Telegram.WebApp.expand();
-        Telegram.WebApp.MainButton.setText('Пригласить друга (+100)').show().onClick(() => {
-            Telegram.WebApp.openTelegramLink('https://t.me/share/url?url=' + encodeURIComponent(window.location.href));
+        Telegram.WebApp.MainButton.setText('👥 Пригласить друга (+100)').show().onClick(() => {
+            Telegram.WebApp.openTelegramLink('https://t.me/share/url?url=' + encodeURIComponent(window.location.href) + '&text=Играй в Virus Clone!');
         });
 
-        const BACKEND_URL = 'https://virus-backend.vercel.app'; // Замените на ваш backend URL
-        let tokens = 0;
-        let health = 100;
+        const BACKEND_URL = 'https://virus-backend.vercel.app'; // ← ЗАМЕНИТЕ на URL backend!
+        let tokens = 0, health = 100, infected = false;
+        
         const connector = new TON_CONNECT_SDK.TonConnect({
-            manifestUrl: 'https://your-vercel-url.vercel.app/tonconnect-manifest.json' // Ваш Vercel URL
+            manifestUrl: window.location.origin + '/tonconnect-manifest.json'
         });
 
-        // Тап с backend
+        // Загрузка данных
+        async function loadData() {
+            try {
+                const res = await fetch(`${BACKEND_URL}/api/user`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({initData: Telegram.WebApp.initData})
+                });
+                const data = await res.json();
+                tokens = data.tokens;
+                health = data.health;
+                infected = data.infected;
+                updateUI();
+            } catch(e) {}
+        }
+
+        // Тап
         document.getElementById('tap').onclick = async () => {
-            const response = await fetch(`${BACKEND_URL}/api/tap`, {
+            const res = await fetch(`${BACKEND_URL}/api/tap`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({initData: Telegram.WebApp.initData})
             });
-            const data = await response.json();
+            const data = await res.json();
             tokens = data.tokens;
             health = data.health;
+            infected = data.infected;
             updateUI();
-            Telegram.WebApp.HapticFeedback.impactOccurred('light');
+            Telegram.WebApp.HapticFeedback.impactOccurred('medium');
         };
 
         // Рулетка
         document.getElementById('roulette').onclick = async () => {
-            if (tokens < 10) return alert('Нужно 10 $VIRUS');
-            const win = Math.random() > 0.5;
-            tokens = win ? tokens * 2 : tokens - 10;
-            await fetch(`${BACKEND_URL}/api/roulette`, {
+            if (tokens < 10) return Telegram.WebApp.showAlert('Нужно 10 $VIRUS!');
+            const res = await fetch(`${BACKEND_URL}/api/roulette`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({initData: Telegram.WebApp.initData, win})
+                body: JSON.stringify({initData: Telegram.WebApp.initData})
             });
+            const data = await res.json();
+            tokens = data.tokens;
             updateUI();
-            Telegram.WebApp.HapticFeedback.notificationOccurred(win ? 'success' : 'error');
+            Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+        };
+
+        // Задания
+        document.getElementById('tasks').onclick = async () => {
+            const res = await fetch(`${BACKEND_URL}/api/task`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({initData: Telegram.WebApp.initData})
+            });
+            const data = await res.json();
+            tokens = data.tokens;
+            document.getElementById('status').textContent = data.message || '';
+            updateUI();
         };
 
         // Вывод TON
         document.getElementById('withdraw').onclick = async () => {
-            if (tokens < 100) return alert('Минимум 100 $VIRUS');
+            if (tokens < 100) return Telegram.WebApp.showAlert('Минимум 100 $VIRUS!');
             try {
                 await connector.connect();
-                // TON транзакция (Jetton transfer, замените на ваш contract)
-                const transaction = {
+                const tx = {
                     validUntil: Math.floor(Date.now() / 1000) + 300,
                     messages: [{
-                        address: 'YOUR_JETTON_WALLET', // Ваш TON wallet
-                        amount: (tokens * 1000000000).toString(), // nanoTON
-                        payload: 'Withdraw'
+                        address: 'EQD...YOUR_WALLET_ADDRESS', // Ваш TON кошелёк
+                        amount: (tokens * 1e9).toString(), // nanoTON
+                        payload: 'Virus withdraw'
                     }]
                 };
-                await connector.sendTransaction(transaction);
-                alert('Вывод отправлен!');
-            } catch (e) { alert('Ошибка: ' + e.message); }
+                await connector.sendTransaction(tx);
+                Telegram.WebApp.showAlert('Вывод отправлен!');
+            } catch(e) {
+                Telegram.WebApp.showAlert('Подключите TON Wallet!');
+            }
         };
 
         function updateUI() {
             document.getElementById('tokens').textContent = `Токены $VIRUS: ${tokens}`;
-            document.getElementById('health').textContent = `Здоровье: ${health}% ${health < 50 ? '😷' : '💪'}`;
+            let status = health < 50 ? '😷' : '💪';
+            if (infected) status += ' ЗАРАЖЁН!';
+            document.getElementById('health').innerHTML = `Здоровье: ${health}% ${status}`;
         }
 
-        // Загрузка баланса
-        updateUI();
+        loadData(); // Загрузка при старте
     </script>
 </body>
 </html>
